@@ -549,7 +549,7 @@ body {
   left: 50%;
   bottom: 28px;
   transform: translateX(-50%);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 18px;
@@ -560,6 +560,13 @@ body {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   z-index: 1000;
+  cursor: grab;
+  user-select: none;
+}
+
+.batch-toolbar.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 18px 34px rgba(138, 75, 255, 0.3);
 }
 
 .batch-float-enter-active,
@@ -577,6 +584,45 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: #8a4bff;
+  white-space: nowrap;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-btn {
+  border-radius: 999px !important;
+  font-weight: 600;
+  border: none !important;
+}
+
+.batch-btn-copy {
+  background: linear-gradient(135deg, #6a9eff 0%, #8ab4ff 100%) !important;
+  color: #fff !important;
+}
+
+.batch-btn-delete {
+  background: linear-gradient(135deg, #ff7b7b 0%, #ff9f9f 100%) !important;
+  color: #fff !important;
+}
+
+.batch-btn-download {
+  background: linear-gradient(135deg, #35d49b 0%, #7ee6c1 100%) !important;
+  color: #fff !important;
+}
+
+.batch-btn-cancel {
+  background: rgba(80, 80, 80, 0.15) !important;
+  color: #3b3b3b !important;
+}
+
+.batch-shortcuts {
+  font-size: 11px;
+  color: rgba(55, 55, 55, 0.7);
+  margin-left: 4px;
   white-space: nowrap;
 }
 
@@ -610,6 +656,10 @@ body {
     max-width: 92vw;
     flex-wrap: wrap;
     justify-content: center;
+  }
+  .batch-shortcuts {
+    width: 100%;
+    text-align: center;
   }
   .home-btn {
     width: 32px;

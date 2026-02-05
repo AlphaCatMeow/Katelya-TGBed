@@ -311,19 +311,25 @@
         </el-footer>
       </el-main>
     </el-container>
+    <!-- 底部悬浮批量操作栏 -->
+    <transition name="batch-float">
+      <div class="batch-toolbar"
+           v-if="selectedFiles.length > 0"
+           ref="batchToolbar"
+           @mousedown.stop="startBatchDrag"
+           :class="{ 'is-dragging': batchDragState.dragging }"
+           :style="batchToolbarStyle">
+        <span class="batch-count">已选 {{ selectedFiles.length }} 项</span>
+        <el-button-group size="mini" class="batch-actions">
+          <el-button class="batch-btn batch-btn-copy" icon="el-icon-document-copy" @click="handleBatchCopy">复制链接</el-button>
+          <el-button class="batch-btn batch-btn-delete" icon="el-icon-delete" @click="handleBatchDelete">删除</el-button>
+          <el-button class="batch-btn batch-btn-download" icon="el-icon-download" @click="handleBatchDownload">下载</el-button>
+        </el-button-group>
+        <el-button class="batch-btn batch-btn-cancel" icon="el-icon-close" @click="clearSelection">取消选择</el-button>
+        <span class="batch-shortcuts">快捷键：Ctrl/Cmd + C 复制 · D 下载 · Del 删除 · Esc 取消</span>
+      </div>
+    </transition>
   </div>
-  <!-- 底部悬浮批量操作栏 -->
-  <transition name="batch-float">
-    <div class="batch-toolbar" v-show="selectedFiles.length > 0">
-      <span class="batch-count">已选 {{ selectedFiles.length }} 项</span>
-      <el-button-group size="mini">
-        <el-button type="primary" icon="el-icon-document-copy" @click="handleBatchCopy">复制链接</el-button>
-        <el-button type="danger" icon="el-icon-delete" @click="handleBatchDelete">删除</el-button>
-        <el-button icon="el-icon-download" @click="handleBatchDownload">下载</el-button>
-        <el-button @click="clearSelection">取消选择</el-button>
-      </el-button-group>
-    </div>
-  </transition>
 </body>
 <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script> <!-- Vue -->
 <script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.3/lib/index.js"></script> <!-- ElementUI -->
@@ -386,6 +392,15 @@
         kv: { connected: false, message: '检查中...' },
         r2: { connected: false, message: '检查中...', enabled: false },
         auth: { enabled: false, message: '检查中...' }
+      },
+      batchToolbarPosition: {
+        left: null,
+        top: null
+      },
+      batchDragState: {
+        dragging: false,
+        offsetX: 0,
+        offsetY: 0
       },
       quickWebsites: [
         { name: '上传中心', url: './', icon: 'fas fa-cloud-upload-alt' },
@@ -470,6 +485,17 @@
         return this.storageFilter === 'all' ? 'fas fa-database' :
         this.storageFilter === 'telegram' ? 'fab fa-telegram' :
         this.storageFilter === 'r2' ? 'fas fa-cloud' : 'fas fa-database';
+      },
+      batchToolbarStyle() {
+        if (this.batchToolbarPosition.left === null || this.batchToolbarPosition.top === null) {
+          return {};
+        }
+        return {
+          left: `${this.batchToolbarPosition.left}px`,
+          top: `${this.batchToolbarPosition.top}px`,
+          bottom: 'auto',
+          transform: 'translate(0, 0)'
+        };
       }
     },
     watch: {  // 监听数据变化
@@ -479,6 +505,16 @@
         },
         deep: true
       },
+      selectedFiles(newValue) {
+        if (newValue.length === 0) {
+          this.batchToolbarPosition.left = null;
+          this.batchToolbarPosition.top = null;
+          return;
+        }
+        if (this.batchToolbarPosition.left === null) {
+          this.$nextTick(() => this.snapBatchToolbarToBottom());
+        }
+      },
       sortOption(newOption) { localStorage.setItem('sortOption', newOption); },
       filterOption(newOption) { localStorage.setItem('filterOption', newOption); }
     },
@@ -487,6 +523,82 @@
       refreshDashboard() { location.reload(); },  // 刷新页面
       clearSelection() {  // 取消全部选择
         this.tableData.forEach(file => file.selected = false);
+      },
+      startBatchDrag(event) {
+        if (event.button !== 0) return;
+        const toolbar = this.$refs.batchToolbar;
+        if (!toolbar) return;
+        const rect = toolbar.getBoundingClientRect();
+        this.batchDragState.dragging = true;
+        this.batchDragState.offsetX = event.clientX - rect.left;
+        this.batchDragState.offsetY = event.clientY - rect.top;
+        this.batchToolbarPosition.left = rect.left;
+        this.batchToolbarPosition.top = rect.top;
+        document.addEventListener('mousemove', this.onBatchDrag);
+        document.addEventListener('mouseup', this.stopBatchDrag);
+      },
+      onBatchDrag(event) {
+        if (!this.batchDragState.dragging) return;
+        const toolbar = this.$refs.batchToolbar;
+        if (!toolbar) return;
+        const width = toolbar.offsetWidth;
+        const height = toolbar.offsetHeight;
+        const padding = 12;
+        let left = event.clientX - this.batchDragState.offsetX;
+        let top = event.clientY - this.batchDragState.offsetY;
+        left = Math.max(padding, Math.min(left, window.innerWidth - width - padding));
+        top = Math.max(padding, Math.min(top, window.innerHeight - height - padding));
+        this.batchToolbarPosition.left = left;
+        this.batchToolbarPosition.top = top;
+      },
+      stopBatchDrag() {
+        if (!this.batchDragState.dragging) return;
+        this.batchDragState.dragging = false;
+        document.removeEventListener('mousemove', this.onBatchDrag);
+        document.removeEventListener('mouseup', this.stopBatchDrag);
+        this.snapBatchToolbarToBottom();
+      },
+      snapBatchToolbarToBottom() {
+        const toolbar = this.$refs.batchToolbar;
+        if (!toolbar) return;
+        const padding = 12;
+        const bottomOffset = 24;
+        const width = toolbar.offsetWidth;
+        const height = toolbar.offsetHeight;
+        let left = this.batchToolbarPosition.left ?? (window.innerWidth - width) / 2;
+        left = Math.max(padding, Math.min(left, window.innerWidth - width - padding));
+        this.batchToolbarPosition.left = left;
+        this.batchToolbarPosition.top = window.innerHeight - height - bottomOffset;
+      },
+      handleGlobalKeydown(event) {
+        if (this.selectedFiles.length === 0) return;
+        const target = event.target;
+        const isInput = target && (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        );
+        if (isInput) return;
+        const key = event.key.toLowerCase();
+        if ((event.ctrlKey || event.metaKey) && key === 'c') {
+          event.preventDefault();
+          this.handleBatchCopy();
+          return;
+        }
+        if (key === 'd') {
+          event.preventDefault();
+          this.handleBatchDownload();
+          return;
+        }
+        if (key === 'delete' || key === 'backspace') {
+          event.preventDefault();
+          this.handleBatchDelete();
+          return;
+        }
+        if (key === 'escape') {
+          event.preventDefault();
+          this.clearSelection();
+        }
       },
       
       // 获取文件的实际类型（用于模板条件渲染）
@@ -630,6 +742,12 @@
       updateWindowWidth() {  // 动态调整页面大小
         this.windowWidth = window.innerWidth;
         this.calculatePageSize();
+      },
+      handleWindowResize() {
+        this.updateWindowWidth();
+        if (this.selectedFiles.length > 0) {
+          this.$nextTick(() => this.snapBatchToolbarToBottom());
+        }
       },
       updateStats() {
         this.Number = this.tableData.length;
@@ -1339,7 +1457,8 @@
         return;
       }
 
-      window.addEventListener('resize', this.calculatePageSize);
+      window.addEventListener('resize', this.handleWindowResize);
+      window.addEventListener('keydown', this.handleGlobalKeydown);
       this.updateWindowWidth();
 
       // 获取文件列表数据
@@ -1381,6 +1500,13 @@
       if (localStorage.getItem('quickWebsites')) {
         this.quickWebsites = JSON.parse(localStorage.getItem('quickWebsites'));
       }
+    }
+    ,
+    beforeDestroy() {
+      document.removeEventListener('mousemove', this.onBatchDrag);
+      document.removeEventListener('mouseup', this.stopBatchDrag);
+      window.removeEventListener('keydown', this.handleGlobalKeydown);
+      window.removeEventListener('resize', this.handleWindowResize);
     }
   });
 </script>
