@@ -18,14 +18,14 @@ import {
 } from "../utils/telegram.js";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-// 请求超时时间�?0秒）
+// 请求超时时间（30秒）
 const FETCH_TIMEOUT = 30000;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    // 解析请求�?
+    // 解析请求体
     const body = await request.json();
     const { url, storageMode = "telegram" } = body;
 
@@ -78,16 +78,16 @@ export async function onRequestPost(context) {
     const arrayBuffer = await fetchResponse.arrayBuffer();
     const fileSize = arrayBuffer.byteLength;
 
-    // 检查文件大�?
+    // 检查文件大小
     if (fileSize === 0) {
-      return jsonResponse({ error: "目标URL返回的内容为�? }, 400);
+      return jsonResponse({ error: "目标URL返回的内容为空" }, 400);
     }
 
     if (fileSize > MAX_FILE_SIZE) {
       return jsonResponse({ error: `文件大小(${formatSize(fileSize)})超过限制(${formatSize(MAX_FILE_SIZE)})` }, 413);
     }
 
-    // 从URL路径提取文件�?
+    // 从URL路径提取文件名
     let fileName = parsedUrl.pathname.split("/").pop() || "";
     fileName = decodeURIComponent(fileName.split("?")[0]);
 
@@ -106,16 +106,16 @@ export async function onRequestPost(context) {
     // 根据存储模式上传
     if (storageMode === "r2") {
       if (!env.R2_BUCKET) {
-        return jsonResponse({ error: "R2 未配置或未启�? }, 400);
+        return jsonResponse({ error: "R2 未配置或未启用" }, 400);
       }
       return await uploadToR2(arrayBuffer, fileName, fileExtension, contentType, fileSize, env);
     } else {
-      // 默认上传�?Telegram
+      // 默认上传到 Telegram
       return await uploadToTelegram(arrayBuffer, fileName, fileExtension, contentType, fileSize, env);
     }
   } catch (error) {
     console.error("URL upload error:", error);
-    return jsonResponse({ error: "服务器内部错�? " + error.message }, 500);
+    return jsonResponse({ error: "服务器内部错误: " + error.message }, 500);
   }
 }
 
@@ -169,7 +169,7 @@ function getExtensionFromMimeType(mimeType) {
 
 // --- Telegram 上传 ---
 async function uploadToTelegram(arrayBuffer, fileName, fileExtension, contentType, fileSize, env) {
-  // �?arrayBuffer 创建 Blob �?File
+  // 从 arrayBuffer 创建 Blob 和 File
   const blob = new Blob([arrayBuffer], { type: contentType });
   const file = new File([blob], fileName, { type: contentType });
 
@@ -194,7 +194,7 @@ async function uploadToTelegram(arrayBuffer, fileName, fileExtension, contentTyp
   const responseData = await response.json();
 
   if (!response.ok) {
-    // 如果图片/音频上传失败，尝试作为文档上�?
+    // 如果图片/音频上传失败，尝试作为文档上传
     if (apiEndpoint === "sendPhoto" || apiEndpoint === "sendAudio") {
       const docFormData = new FormData();
       docFormData.append("chat_id", env.TG_Chat_ID);
@@ -255,7 +255,7 @@ async function processTelegramSuccess(
     env
   );
 
-  // 保存�?KV
+  // 保存到 KV
   if (env.img_url && shouldWriteTelegramMetadata(env)) {
     await env.img_url.put(`${fileId}.${fileExtension}`, "", {
       metadata: {
